@@ -12,6 +12,12 @@ lib/
 # TypeScript
 *.tsbuildinfo
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
 # Environment variables
 .env
 .env.local
@@ -103,3 +109,4 @@ test-results.xml
 package-lock.json
 yarn.lock
 pnpm-lock.yaml 
+codetxt
