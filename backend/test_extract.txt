@@ -1,0 +1,1071 @@
+from extractors import extract_text_from_pdf
+"""
+file_path = r"C:\Users\tatch\Desktop\esg_report_builder\backend\uploads\Stellantis-Expanded-Sustainability-Statement-2024.pdf"
+texte = extract_text_from_pdf(file_path)
+print(f"Longueur texte extrait: {len(texte)}")
+print(texte[:1000])  # affiche un extrait
+@app.post("/generate-esg-environment/{report_id}")
+async def generate_esg_environmental_analysis(report_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT extracted_text FROM reports WHERE id = ?", (report_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row or not row["extracted_text"]:
+        raise HTTPException(status_code=404, detail="Texte extrait non trouvé pour ce rapport.")
+
+    prompt = f
+    Tu es un expert ESG. Analyse **uniquement** les éléments liés à l’environnement (indicateurs E1 à E5) dans ce rapport :
+    
+    {row["extracted_text"]}
+    
+    ➤ Fournis un résumé structuré, avec une section distincte pour chaque indicateur (E1 à E5).  
+    ➤ Termine par une suggestion d’amélioration pour chaque point, si possible.  
+    ➤ Le texte peut contenir des parties en anglais et en français, gère-les sans problème.  
+    ➤ Réponds de manière professionnelle et claire, en français.
+    
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    body = {
+        "model": OPENROUTER_MODEL ,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ]
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=body,
+                timeout=90
+            )
+            response.raise_for_status()
+            result = response.json()
+            return {"esg_environment_report": result["choices"][0]["message"]["content"]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/download-analysis-pdf/{report_id}")
+async def download_analysis_pdf(report_id: int):
+    Télécharge l'analyse d'un rapport en PDF
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Récupérer les informations du rapport
+        cursor.execute("SELECT filename, extracted_text FROM reports WHERE id = ?", (report_id,))
+        report = cursor.fetchone()
+        
+        if not report:
+            raise HTTPException(status_code=404, detail="Rapport introuvable")
+        
+        # Générer l'analyse (réutiliser la logique existante)
+        prompt = fVoici un extrait de rapport ESG. Peux-tu détecter les normes ESRS mentionnées et donner un résumé clair ?
+        \n\n{report["extracted_text"][:3000]}
+    
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": OPENROUTER_MODEL,
+            "messages": [
+                {"role": "system", "content": "Tu es un expert en reporting ESG selon les normes ESRS."},
+                {"role": "user", "content": prompt}
+            ]
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers)
+            
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail="Erreur GPT: " + response.text)
+        
+        gpt_analysis = response.json()["choices"][0]["message"]["content"]
+        
+        # Créer le contenu HTML pour le PDF
+        html_content = f
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Analyse ESG - {report["filename"]}</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }}
+                .header {{ border-bottom: 3px solid #4F46E5; padding-bottom: 20px; margin-bottom: 30px; }}
+                .title {{ color: #4F46E5; font-size: 24px; font-weight: bold; }}
+                .subtitle {{ color: #6B7280; font-size: 14px; margin-top: 5px; }}
+                .content {{ white-space: pre-wrap; text-align: justify; }}
+                .footer {{ margin-top: 40px; padding-top: 20px; border-top: 1px solid #E5E7EB; font-size: 12px; color: #6B7280; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="title">Analyse ESG - Rapport Individual</div>
+                <div class="subtitle">Fichier: {report["filename"]}</div>
+                <div class="subtitle">Date de génération: {datetime.now().strftime("%d/%m/%Y à %H:%M")}</div>
+            </div>
+            <div class="content">{gpt_analysis}</div>
+            <div class="footer">
+                Généré par ESG Report Builder - Analyse basée sur les normes ESRS
+            </div>
+        </body>
+        </html>
+        
+        
+        # Retourner le HTML (le frontend se chargera de la conversion en PDF)
+        return Response(
+            content=html_content,
+            media_type="text/html",
+            headers={
+                "Content-Disposition": f"attachment; filename=analyse_esg_{report_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la génération: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/download-analysis-json/{report_id}")
+async def download_analysis_json(report_id: int):
+    Télécharge l'analyse d'un rapport en JSON
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("SELECT id, filename, upload_date, extracted_text FROM reports WHERE id = ?", (report_id,))
+        report = cursor.fetchone()
+        
+        if not report:
+            raise HTTPException(status_code=404, detail="Rapport introuvable")
+        
+        # Générer l'analyse
+        prompt = fVoici un extrait de rapport ESG. Peux-tu détecter les normes ESRS mentionnées et donner un résumé clair ?
+        \n\n{report["extracted_text"][:3000]}
+        
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": OPENROUTER_MODEL,
+            "messages": [
+                {"role": "system", "content": "Tu es un expert en reporting ESG selon les normes ESRS."},
+                {"role": "user", "content": prompt}
+            ]
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers)
+            
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail="Erreur GPT: " + response.text)
+        
+        gpt_analysis = response.json()["choices"][0]["message"]["content"]
+        
+        # Créer l'objet JSON
+        json_data = {
+            "type": "analyse_individuelle",
+            "rapport": {
+                "id": report["id"],
+                "filename": report["filename"],
+                "upload_date": report["upload_date"]
+            },
+            "analyse": gpt_analysis,
+            "metadata": {
+                "date_generation": datetime.now().isoformat(),
+                "modele_ia": OPENROUTER_MODEL,
+                "version": "1.0"
+            }
+        }
+        
+        return Response(
+            content=json.dumps(json_data, ensure_ascii=False, indent=2),
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f"attachment; filename=analyse_esg_{report_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la génération: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
+"""
+
+@app.post("/download-comparison-pdf")
+async def download_comparison_pdf(comparison: ReportComparison):
+    """Télécharge la comparaison de deux rapports en PDF"""
+    conn = None
+    cursor = None
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        print(f"🔍 Generating PDF comparison: {comparison.report1_id} vs {comparison.report2_id}")
+        
+        # Récupérer les deux rapports
+        cursor.execute("SELECT id, filename, extracted_text FROM reports WHERE id = ?", (comparison.report1_id,))
+        report1 = cursor.fetchone()
+        
+        cursor.execute("SELECT id, filename, extracted_text FROM reports WHERE id = ?", (comparison.report2_id,))
+        report2 = cursor.fetchone()
+        
+        if not report1 or not report2:
+            raise HTTPException(status_code=404, detail="Un ou plusieurs rapports introuvables")
+        
+        print("✅ Reports found in database")
+        
+        # Générer la comparaison (réutiliser la logique existante)
+        prompt = f"""Tu es un expert ESG. Compare ces deux rapports en analysant leurs différences et similitudes selon les critères environnementaux des ESRS (E1 à E5).
+
+        **RAPPORT 1 - {report1["filename"]}:**
+        {report1["extracted_text"][:2500]}
+
+        **RAPPORT 2 - {report2["filename"]}:**
+        {report2["extracted_text"][:2500]}
+
+        ➤ Fournis une analyse comparative structurée avec :
+        1. **Points communs** en matière environnementale
+        2. **Différences clés** dans l'approche E1 à E5
+        3. **Forces et faiblesses** de chaque rapport (E uniquement)
+        4. **Recommandations** pour améliorer le moins bon
+        5. **Score environnemental** sur 10 basé sur les critères ESRS
+
+        ➤ Réponds de manière claire, professionnelle et en français.
+"""
+        
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": OPENROUTER_MODEL,
+            "messages": [
+                {"role": "system", "content": "Tu es un expert en reporting ESG selon les normes ESRS qui effectue des analyses comparatives détaillées."},
+                {"role": "user", "content": prompt}
+            ],
+            "max_tokens": 1500,  # Add token limit
+            "temperature": 0.3
+        }
+        
+        print("🤖 Calling OpenRouter API...")
+        
+        # Add timeout and better error handling
+        timeout = httpx.Timeout(60.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers)
+            
+        if response.status_code == 402:
+            print("❌ OpenRouter credits exhausted")
+            raise HTTPException(status_code=402, detail="Crédits OpenRouter épuisés")
+        elif response.status_code != 200:
+            print(f"❌ OpenRouter API error: {response.status_code} - {response.text}")
+            raise HTTPException(status_code=500, detail="Erreur GPT: " + response.text)
+        
+        comparison_analysis = response.json()["choices"][0]["message"]["content"]
+        print("✅ Analysis generated successfully")
+        
+        # Créer le contenu HTML pour le PDF
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Comparaison ESG - {report1["filename"]} vs {report2["filename"]}</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }}
+                .header {{ border-bottom: 3px solid #7C3AED; padding-bottom: 20px; margin-bottom: 30px; }}
+                .title {{ color: #7C3AED; font-size: 24px; font-weight: bold; }}
+                .subtitle {{ color: #6B7280; font-size: 14px; margin-top: 5px; }}
+                .reports-info {{ background: #F3F4F6; padding: 15px; border-radius: 8px; margin-bottom: 30px; }}
+                .report-item {{ margin-bottom: 10px; }}
+                .report-label {{ font-weight: bold; color: #374151; }}
+                .content {{ white-space: pre-wrap; text-align: justify; }}
+                .footer {{ margin-top: 40px; padding-top: 20px; border-top: 1px solid #E5E7EB; font-size: 12px; color: #6B7280; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="title">Analyse Comparative ESG</div>
+                <div class="subtitle">Date de génération: {datetime.now().strftime("%d/%m/%Y à %H:%M")}</div>
+            </div>
+            <div class="reports-info">
+                <div class="report-item">
+                    <span class="report-label">Rapport 1:</span> {report1["filename"]}
+                </div>
+                <div class="report-item">
+                    <span class="report-label">Rapport 2:</span> {report2["filename"]}
+                </div>
+            </div>
+            <div class="content">{comparison_analysis}</div>
+            <div class="footer">
+                Généré par ESG Report Builder - Analyse comparative basée sur les normes ESRS
+            </div>
+        </body>
+        </html>
+        """
+        
+        filename = f"comparaison_esg_{comparison.report1_id}_vs_{comparison.report2_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+        print(f"✅ HTML content generated, filename: {filename}")
+        
+        return Response(
+            content=html_content,
+            media_type="text/html",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Unexpected error in download_comparison_pdf: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la génération: {str(e)}")
+    finally:
+        # Properly close database connections
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+            print("🔒 Database connection closed")
+
+@app.post("/download-comparison-json") 
+async def download_comparison_json(comparison: ReportComparison):
+    """Télécharge la comparaison de deux rapports en JSON"""
+    conn = None
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Validation des IDs
+        if not comparison.report1_id or not comparison.report2_id:
+            raise HTTPException(status_code=400, detail="IDs de rapports manquants")
+        
+        if comparison.report1_id == comparison.report2_id:
+            raise HTTPException(status_code=400, detail="Impossible de comparer un rapport avec lui-même")
+        
+        print(f"🔍 Comparaison demandée: {comparison.report1_id} vs {comparison.report2_id}")
+        
+        # Récupérer les deux rapports avec vérification d'existence
+        cursor.execute("SELECT id, filename, upload_date FROM reports WHERE id = ?", (comparison.report1_id,))
+        report1 = cursor.fetchone()
+        
+        cursor.execute("SELECT id, filename, upload_date FROM reports WHERE id = ?", (comparison.report2_id,))
+        report2 = cursor.fetchone()
+        
+        if not report1:
+            raise HTTPException(status_code=404, detail=f"Rapport {comparison.report1_id} introuvable")
+        if not report2:
+            raise HTTPException(status_code=404, detail=f"Rapport {comparison.report2_id} introuvable")
+        
+        print("✅ Rapports trouvés en base")
+        
+        # Récupérer les textes pour l'analyse
+        cursor.execute("SELECT extracted_text FROM reports WHERE id = ?", (comparison.report1_id,))
+        report1_data = cursor.fetchone()
+        report1_text = report1_data["extracted_text"] if report1_data else ""
+        
+        cursor.execute("SELECT extracted_text FROM reports WHERE id = ?", (comparison.report2_id,))
+        report2_data = cursor.fetchone()
+        report2_text = report2_data["extracted_text"] if report2_data else ""
+        
+        # Validation des textes
+        if not report1_text or not report2_text:
+            raise HTTPException(status_code=400, detail="Texte extrait manquant dans un ou plusieurs rapports")
+        
+        # Optimiser la taille des textes (réduire pour économiser les tokens)
+        max_text_length =1500  # Réduit pour économiser les tokens
+        report1_preview = report1_text[:max_text_length] + ("..." if len(report1_text) > max_text_length else "")
+        report2_preview = report2_text[:max_text_length] + ("..." if len(report2_text) > max_text_length else "")
+        
+        print(f"📝 Textes préparés: R1={len(report1_preview)} chars, R2={len(report2_preview)} chars")
+        
+        # Générer la comparaison avec timeout et retry
+        comparison_analysis = await generate_comparison_analysis(
+            report1, report2, report1_preview, report2_preview
+        )
+        
+        print("✅ Analyse générée par IA")
+        
+        # Créer l'objet JSON avec validation
+        json_data = {
+            "type": "comparaison",
+            "rapport1": {
+                "id": report1["id"],
+                "filename": report1["filename"],
+                "upload_date": report1["upload_date"],
+                "text_length": len(report1_text)
+            },
+            "rapport2": {
+                "id": report2["id"],
+                "filename": report2["filename"],
+                "upload_date": report2["upload_date"],
+                "text_length": len(report2_text)
+            },
+            "analyse_comparative": comparison_analysis,
+            "metadata": {
+                "date_generation": datetime.now().isoformat(),
+                "modele_ia": OPENROUTER_MODEL,
+                "version": "1.1",
+                "text_analyzed_length": {
+                    "rapport1": len(report1_preview),
+                    "rapport2": len(report2_preview)
+                }
+            }
+        }
+        
+        # Valider que le JSON est sérialisable
+        try:
+            json_content = json.dumps(json_data, ensure_ascii=False, indent=2)
+        except TypeError as e:
+            print(f"❌ Erreur sérialisation JSON: {e}")
+            raise HTTPException(status_code=500, detail="Erreur de sérialisation des données")
+        
+        filename = f"comparaison_esg_{comparison.report1_id}_vs_{comparison.report2_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        
+        return Response(
+            content=json_content,
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Type": "application/json; charset=utf-8"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Erreur inattendue: {e}")
+        print(f"❌ Type: {type(e).__name__}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la génération: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
+
+
+
+async def generate_comparison_analysis(report1, report2, report1_text, report2_text):
+    """Génère l'analyse comparative avec gestion d'erreur robuste"""
+    
+    prompt = f"""
+    Compare ces 2 rapports ESG selon les critères environnementaux ESRS (E1 à E5) :
+
+    **RAPPORT 1 - {report1["filename"]}:**
+    {report1_text}
+
+    **RAPPORT 2 - {report2["filename"]}:**
+    {report2_text}
+
+    Analyse structurée :
+    1. **SYNTHÈSE ENVIRONNEMENTALE** (2 lignes)
+    2. **POINTS COMMUNS** (E1 à E5)
+    3. **DIFFÉRENCES CLÉS** en matière environnementale
+    4. **FORCES/FAIBLESSES** de chaque rapport (pilier E)
+    5. **RECOMMANDATIONS** pour s’aligner aux ESRS
+    6. **SCORE ENVIRONNEMENTAL** sur 10
+
+    Réponse concise, professionnelle et en français.
+    """
+
+    
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": OPENROUTER_MODEL,
+        "messages": [
+            {"role": "system", "content": "Tu es un expert en reporting ESG selon les normes ESRS qui effectue des analyses comparatives détaillées."},
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 2800,  # Réduit pour rester sous la limite de crédits
+        "temperature": 0.3
+    }
+    
+    # Retry avec backoff exponentiel
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            timeout = httpx.Timeout(60.0)  # 60 secondes timeout
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                print(f"🤖 Appel IA (tentative {attempt + 1}/{max_retries})...")
+                response = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions", 
+                    json=payload, 
+                    headers=headers
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    return result["choices"][0]["message"]["content"]
+                elif response.status_code == 429:  # Rate limit
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt  # Backoff exponentiel
+                        print(f"⏳ Rate limit atteint, attente {wait_time}s...")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        raise HTTPException(status_code=429, detail="Limite de taux API atteinte")
+                else:
+                    print(f"❌ Erreur API: {response.status_code} - {response.text}")
+                    raise HTTPException(status_code=500, detail=f"Erreur API OpenRouter: {response.status_code}")
+                    
+        except httpx.TimeoutException:
+            if attempt < max_retries - 1:
+                print(f"⏳ Timeout, retry dans {2 ** attempt}s...")
+                await asyncio.sleep(2 ** attempt)
+                continue
+            else:
+                raise HTTPException(status_code=504, detail="Timeout API - réessayez plus tard")
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"❌ Erreur réseau (tentative {attempt + 1}): {e}")
+                await asyncio.sleep(2 ** attempt)
+                continue
+            else:
+                raise HTTPException(status_code=500, detail=f"Erreur réseau: {str(e)}")
+    
+    raise HTTPException(status_code=500, detail="Impossible de générer l'analyse après plusieurs tentatives")
+
+
+def generate_comparison_pdf(report1, report2, analysis):
+    """Génère un PDF de comparaison"""
+    try:
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        styles = getSampleStyleSheet()
+        
+        # Style personnalisé
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=30,
+            textColor='darkblue'
+        )
+        
+        content = []
+        
+        # Titre
+        title = f"Comparaison ESG - {report1['filename']} vs {report2['filename']}"
+        content.append(Paragraph(title, title_style))
+        content.append(Spacer(1, 12))
+        
+        # Informations des rapports
+        info_text = f"""
+        <b>Rapport 1:</b> {report1['filename']} (ID: {report1['id']})<br/>
+        <b>Date upload:</b> {report1['upload_date']}<br/><br/>
+        
+        <b>Rapport 2:</b> {report2['filename']} (ID: {report2['id']})<br/>
+        <b>Date upload:</b> {report2['upload_date']}<br/><br/>
+        
+        <b>Date de comparaison:</b> {datetime.now().strftime('%d/%m/%Y %H:%M')}
+        """
+        content.append(Paragraph(info_text, styles['Normal']))
+        content.append(Spacer(1, 20))
+        
+        # Analyse (nettoyer le texte pour PDF)
+        clean_analysis = analysis.replace('**', '<b>').replace('**', '</b>')
+        clean_analysis = clean_analysis.replace('➤', '•')
+        
+        # Diviser l'analyse en paragraphes
+        paragraphs = clean_analysis.split('\n\n')
+        for para in paragraphs:
+            if para.strip():
+                content.append(Paragraph(para.strip(), styles['Normal']))
+                content.append(Spacer(1, 10))
+        
+        # Construire le PDF
+        doc.build(content)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        
+        return pdf_bytes
+        
+    except Exception as e:
+        print(f"❌ Erreur génération PDF: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur génération PDF: {str(e)}")
+
+# Endpoint pour les téléchargements
+@app.post("/download-comparison-pdf")
+async def download_comparison_pdf(comparison: ReportComparison):
+    """
+    Télécharge une comparaison au format HTML (renommé pour compatibilité)
+    """
+    try:
+        # Récupérer la dernière comparaison
+        cached = get_existing_comparison(comparison.user_id, comparison.report1_id, comparison.report2_id)
+        if not cached:
+            raise HTTPException(status_code=404, detail="Aucune comparaison trouvée")
+        
+        # Récupérer les noms des fichiers
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT filename FROM reports WHERE id = ?", (comparison.report1_id,))
+        report1 = cursor.fetchone()
+        cursor.execute("SELECT filename FROM reports WHERE id = ?", (comparison.report2_id,))
+        report2 = cursor.fetchone()
+        conn.close()
+        
+        html_content = f"""
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Comparaison ESG</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; padding: 20px; white-space: pre-wrap; }}
+                h1 {{ color: #2c3e50; }}
+                .report-info {{ background: #f8f9fa; padding: 15px; margin: 10px 0; border-left: 4px solid #007bff; }}
+            </style>
+        </head>
+        <body>
+            <h1>Comparaison ESG</h1>
+            <div class="report-info">
+                <strong>Rapport 1:</strong> {report1['filename'] if report1 else 'N/A'}<br>
+                <strong>Rapport 2:</strong> {report2['filename'] if report2 else 'N/A'}<br>
+                <strong>Date:</strong> {cached['comparison_date']}<br>
+                <strong>Modèle utilisé:</strong> {cached.get('model_used', 'N/A')}
+            </div>
+            <pre>{cached['comparison_text']}</pre>
+        </body>
+        </html>
+        """
+        
+        return Response(
+            content=html_content,
+            media_type="text/html",
+            headers={
+                "Content-Disposition": f"attachment; filename=comparaison_{comparison.report1_id}_vs_{comparison.report2_id}.html"
+            }
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur téléchargement: {str(e)}")
+
+@app.post("/download-comparison-json")
+async def download_comparison_json(comparison: ReportComparison):
+    """
+    Télécharge une comparaison au format JSON
+    """
+    try:
+        cached = get_existing_comparison(comparison.user_id, comparison.report1_id, comparison.report2_id)
+        if not cached:
+            raise HTTPException(status_code=404, detail="Aucune comparaison trouvée")
+        
+        return Response(
+            content=json.dumps(cached, ensure_ascii=False, indent=2),
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f"attachment; filename=comparaison_{comparison.report1_id}_vs_{comparison.report2_id}.json"
+            }
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur téléchargement JSON: {str(e)}")
+def debug_database_tables():
+    """
+    Fonction de débogage pour voir toutes les tables et leurs contenus
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Lister toutes les tables
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        all_tables = [row[0] for row in cursor.fetchall()]
+        print(f"📋 Toutes les tables trouvées: {all_tables}")
+        
+        # Chercher spécifiquement les tables d'analyse
+        analysis_tables = [table for table in all_tables if 'analy' in table.lower()]
+        print(f"🔍 Tables d'analyse: {analysis_tables}")
+        
+        # Vérifier le contenu de chaque table d'analyse
+        for table in analysis_tables:
+            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+            count = cursor.fetchone()[0]
+            print(f"📊 Table '{table}': {count} enregistrements")
+            
+            if count > 0:
+                cursor.execute(f"PRAGMA table_info({table})")
+                columns = [col[1] for col in cursor.fetchall()]
+                print(f"   Colonnes: {columns}")
+                
+                # Afficher quelques exemples
+                cursor.execute(f"SELECT * FROM {table} LIMIT 3")
+                samples = cursor.fetchall()
+                print(f"   Échantillons: {len(samples)} lignes")
+        
+        # Vérifier aussi les tables de comparaison
+        comparison_tables = [table for table in all_tables if 'comparison' in table.lower()]
+        print(f"🔍 Tables de comparaison: {comparison_tables}")
+        
+        for table in comparison_tables:
+            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+            count = cursor.fetchone()[0]
+            print(f"📊 Table '{table}': {count} enregistrements")
+        
+        return all_tables, analysis_tables, comparison_tables
+        
+    except Exception as e:
+        print(f"❌ Erreur debug: {e}")
+        return [], [], []
+    finally:
+        conn.close()
+
+
+def get_analysis_history_fixed(user_id: int = None, report_id: int = None, limit: int = 100):
+    """
+    Version corrigée qui cherche dans toutes les tables possibles
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Lister toutes les tables
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        all_tables = [row[0] for row in cursor.fetchall()]
+        
+        # Chercher les tables d'analyse possibles (plus large)
+        possible_tables = [
+            'advanced_analyses',
+            'advanced_analysis', 
+            'analyses',
+            'analysis',
+            'ai_analyses',
+            'esg_analyses'
+        ]
+        
+        # Trouver quelle table existe réellement
+        existing_table = None
+        for table in possible_tables:
+            if table in all_tables:
+                existing_table = table
+                break
+        
+        # Si aucune table standard trouvée, chercher toute table contenant 'analy'
+        if not existing_table:
+            for table in all_tables:
+                if 'analy' in table.lower():
+                    existing_table = table
+                    break
+        
+        if not existing_table:
+            print(f"❌ Aucune table d'analyse trouvée dans: {all_tables}")
+            return []
+        
+        print(f"✅ Utilisation de la table: {existing_table}")
+        
+        # Vérifier le nombre d'enregistrements
+        cursor.execute(f"SELECT COUNT(*) FROM {existing_table}")
+        total_count = cursor.fetchone()[0]
+        print(f"📊 Total d'enregistrements dans {existing_table}: {total_count}")
+        
+        # Construire la requête
+        base_query = f"""
+            SELECT a.*, r.filename
+            FROM {existing_table} a
+            LEFT JOIN reports r ON a.report_id = r.id
+        """
+        
+        conditions = []
+        params = []
+        
+        if user_id is not None:
+            conditions.append("a.user_id = ?")
+            params.append(user_id)
+            print(f"🔍 Filtrage par user_id: {user_id}")
+        
+        if report_id is not None:
+            conditions.append("a.report_id = ?")
+            params.append(report_id)
+            print(f"🔍 Filtrage par report_id: {report_id}")
+        
+        if conditions:
+            base_query += " WHERE " + " AND ".join(conditions)
+        
+        base_query += f" ORDER BY a.id DESC LIMIT {limit}"
+        
+        print(f"🔍 Requête SQL: {base_query}")
+        print(f"🔍 Paramètres: {params}")
+        
+        cursor.execute(base_query, params)
+        rows = cursor.fetchall()
+        
+        print(f"📊 Lignes trouvées: {len(rows)}")
+        
+        if len(rows) == 0 and conditions:
+            # Test sans filtres pour voir s'il y a des données
+            cursor.execute(f"SELECT COUNT(*) FROM {existing_table}")
+            total = cursor.fetchone()[0]
+            print(f"⚠️ Aucun résultat avec filtres, mais {total} enregistrements au total")
+            
+            # Montrer quelques IDs d'utilisateurs existants
+            cursor.execute(f"SELECT DISTINCT user_id FROM {existing_table} LIMIT 5")
+            existing_users = [row[0] for row in cursor.fetchall()]
+            print(f"👥 IDs utilisateurs existants: {existing_users}")
+        
+        results = []
+        for row in rows:
+            try:
+                result = {
+                    "id": row["id"] if "id" in row.keys() else None,
+                    "report_id": row["report_id"] if "report_id" in row.keys() else None,
+                    "user_id": row["user_id"] if "user_id" in row.keys() else None,
+                    "filename": row["filename"] if "filename" in row.keys() else f"Rapport {row['report_id'] if 'report_id' in row.keys() else 'N/A'}",
+                    "analysis_text": row["analysis_text"] if "analysis_text" in row.keys() else "",
+                    "model_used": row["model_used"] if "model_used" in row.keys() else None,
+                    "tokens_used": row["tokens_used"] if "tokens_used" in row.keys() else 0,
+                }
+                
+                # Date
+                if "analysis_date" in row.keys():
+                    result["analysis_date"] = row["analysis_date"]
+                elif "created_at" in row.keys():
+                    result["analysis_date"] = row["created_at"]
+                else:
+                    result["analysis_date"] = None
+                
+                # Scores
+                scores = {}
+                if "scores_json" in row.keys() and row["scores_json"]:
+                    try:
+                        scores = json.loads(row["scores_json"])
+                    except:
+                        pass
+                elif "scores" in row.keys() and row["scores"]:
+                    try:
+                        scores = json.loads(row["scores"]) if isinstance(row["scores"], str) else row["scores"]
+                    except:
+                        pass
+                
+                result["scores"] = scores
+                results.append(result)
+                
+            except Exception as e:
+                print(f"❌ Erreur traitement ligne: {e}")
+                continue
+        
+        print(f"✅ {len(results)} analyses traitées avec succès")
+        return results
+
+    except Exception as e:
+        print(f"❌ Erreur récupération analyses: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+    finally:
+        conn.close()
+
+
+def get_comparison_history_fixed(user_id: int = None, limit: int = 100):
+    """
+    Version corrigée pour les comparaisons
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Lister toutes les tables
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        all_tables = [row[0] for row in cursor.fetchall()]
+        
+        # Chercher les tables de comparaison possibles
+        possible_tables = [
+            'ai_comparisons',
+            'comparisons',
+            'comparison',
+            'esg_comparisons'
+        ]
+        
+        existing_table = None
+        for table in possible_tables:
+            if table in all_tables:
+                existing_table = table
+                break
+        
+        # Si aucune table standard, chercher 'comparison'
+        if not existing_table:
+            for table in all_tables:
+                if 'comparison' in table.lower():
+                    existing_table = table
+                    break
+        
+        if not existing_table:
+            print(f"❌ Aucune table de comparaison trouvée dans: {all_tables}")
+            return []
+        
+        print(f"✅ Utilisation de la table: {existing_table}")
+        
+        # Vérifier le contenu
+        cursor.execute(f"SELECT COUNT(*) FROM {existing_table}")
+        total_count = cursor.fetchone()[0]
+        print(f"📊 Total de comparaisons dans {existing_table}: {total_count}")
+        
+        # Requête
+        base_query = f'''
+            SELECT ac.*, r1.filename as filename1, r2.filename as filename2
+            FROM {existing_table} ac
+            LEFT JOIN reports r1 ON ac.report1_id = r1.id
+            LEFT JOIN reports r2 ON ac.report2_id = r2.id
+        '''
+        
+        params = []
+        if user_id is not None:
+            base_query += " WHERE ac.user_id = ?"
+            params.append(user_id)
+            print(f"🔍 Filtrage par user_id: {user_id}")
+        
+        base_query += f" ORDER BY ac.id DESC LIMIT {limit}"
+        
+        print(f"🔍 Requête comparaisons: {base_query}")
+        
+        cursor.execute(base_query, params)
+        rows = cursor.fetchall()
+        
+        print(f"📊 Comparaisons trouvées: {len(rows)}")
+        
+        results = []
+        for row in rows:
+            try:
+                result = {
+                    "id": row["id"],
+                    "report1_id": row["report1_id"],
+                    "report2_id": row["report2_id"],
+                    "filename1": row["filename1"] or f"Rapport {row['report1_id']}",
+                    "filename2": row["filename2"] or f"Rapport {row['report2_id']}",
+                    "comparison_text": row["comparison_text"],
+                    "comparison_date": row["comparison_date"] if "comparison_date" in row.keys() else row["created_at"],
+                    "model_used": row["model_used"],
+                    "tokens_used": row["tokens_used"] if "tokens_used" in row.keys() and row["tokens_used"] is not None else 0
+                }
+                
+                # Scores
+                scores = {}
+                if "scores_json" in row.keys() and row["scores_json"]:
+                    try:
+                        scores = json.loads(row["scores_json"])
+                    except:
+                        pass
+                
+                result["scores"] = scores
+                results.append(result)
+                
+            except Exception as e:
+                print(f"❌ Erreur traitement comparaison: {e}")
+                continue
+        
+        print(f"✅ {len(results)} comparaisons traitées")
+        return results
+        
+    except Exception as e:
+        print(f"❌ Erreur récupération comparaisons: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+    finally:
+        conn.close()
+
+
+# Fonction de test rapide
+def test_functions():
+    """
+    Teste les fonctions pour identifier le problème
+    """
+    print("🧪 === TEST DES FONCTIONS ===")
+    
+    # 1. Debug des tables
+    print("\n1️⃣ DÉBOGAGE DES TABLES:")
+    all_tables, analysis_tables, comparison_tables = debug_database_tables()
+    
+    # 2. Test analyses sans filtre
+    print("\n2️⃣ TEST ANALYSES SANS FILTRE:")
+    all_analyses = get_analysis_history_fixed()
+    print(f"Résultat: {len(all_analyses)} analyses")
+    
+    # 3. Test comparaisons sans filtre  
+    print("\n3️⃣ TEST COMPARAISONS SANS FILTRE:")
+    all_comparisons = get_comparison_history_fixed()
+    print(f"Résultat: {len(all_comparisons)} comparaisons")
+    
+    return all_analyses, all_comparisons
+# Exécuter l'initialisation si ce fichier est lancé directement
+def get_user_analytics(user_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT COUNT(*) FROM reports WHERE user_id = ?", (user_id,))
+        total_reports = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM advanced_analyses WHERE user_id = ?", (user_id,))
+        total_advanced_analyses = cursor.fetchone()[0]
+
+        cursor.execute('''
+            SELECT AVG(json_extract(scores_json, '$.global_score')) as avg_global,
+                   AVG(json_extract(scores_json, '$.e1_score')) as avg_e1,
+                   AVG(json_extract(scores_json, '$.e2_score')) as avg_e2,
+                   AVG(json_extract(scores_json, '$.e3_score')) as avg_e3,
+                   AVG(json_extract(scores_json, '$.e4_score')) as avg_e4,
+                   AVG(json_extract(scores_json, '$.e5_score')) as avg_e5
+            FROM advanced_analyses WHERE user_id = ?
+        ''', (user_id,))
+        avg_scores_row = cursor.fetchone()
+        avg_scores = {
+            "global_score": round(avg_scores_row[0] or 0, 1),
+            "e1_score": round(avg_scores_row[1] or 0, 1),
+            "e2_score": round(avg_scores_row[2] or 0, 1),
+            "e3_score": round(avg_scores_row[3] or 0, 1),
+            "e4_score": round(avg_scores_row[4] or 0, 1),
+            "e5_score": round(avg_scores_row[5] or 0, 1)
+        }
+
+        cursor.execute('''
+            SELECT DATE(analysis_date) as date,
+                   AVG(json_extract(scores_json, '$.global_score')) as daily_avg
+            FROM advanced_analyses 
+            WHERE user_id = ? 
+            GROUP BY DATE(analysis_date)
+            ORDER BY date DESC
+            LIMIT 30
+        ''', (user_id,))
+        score_evolution = [{"date": row[0], "score": round(row[1], 1)} for row in cursor.fetchall()]
+
+        return {
+            "user_id": user_id,
+            "total_reports": total_reports,
+            "total_advanced_analyses": total_advanced_analyses,
+            "average_scores": avg_scores,
+            "score_evolution": score_evolution,
+            "generated_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        print(f"❌ Erreur récupération analytics: {e}")
+        raise
+    finally:
+        conn.close()
+

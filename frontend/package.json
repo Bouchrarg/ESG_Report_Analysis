@@ -1,0 +1,25 @@
+{
+  "name": "esg_report_frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.11",
+    "vite": "^7.0.4"
+  },
+  "dependencies": {
+    "@tailwindcss/cli": "^4.1.11",
+    "axios": "^1.10.0",
+    "framer-motion": "^12.23.6",
+    "jwt-decode": "^4.0.0",
+    "lucide-react": "^0.525.0",
+    "react-router-dom": "^7.7.0"
+  }
+}
