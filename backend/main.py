@@ -44,6 +44,7 @@ origins = [
     ).split(",")
     if origin.strip()
 ]
+print(f"🌐 CORS allowed origins: {origins}")
 
 
 app.add_middleware(
