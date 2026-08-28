@@ -108,5 +108,15 @@ test-results.xml
 # Package manager files
 package-lock.json
 yarn.lock
-pnpm-lock.yaml 
+pnpm-lock.yaml
 codetxt
+
+# Python virtual environment
+venv/
+.venv/
+
+# Local database and uploaded sample reports, not part of the project
+*.db
+*.sqlite
+*.sqlite3
+backend/uploads/
