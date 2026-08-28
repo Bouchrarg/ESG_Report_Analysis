@@ -17,5 +17,4 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
       - key: ALLOWED_ORIGINS
-        # Replace with the real Vercel URL once the frontend is deployed
-        value: http://localhost:5173
+        value: https://esg-report-analysis.vercel.app
