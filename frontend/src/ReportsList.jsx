@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { API_BASE } from './config';
 
 function ReportsList({ userId, onSelectReport }) {
   const [reports, setReports] = useState([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`http://localhost:8000/reports/${userId}`)
+    fetch(`${API_BASE}/reports/${userId}`)
       .then((res) => {
         if (!res.ok) throw new Error("Erreur de chargement");
         return res.json();

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE } from './config';
 import axios from "axios";
 import { useNavigate } from "react-router-dom";  // <-- IMPORT
 
@@ -16,7 +17,7 @@ function Login() {
     setLoading(true);  // <-- activation du loading
 
     try {
-      const response = await axios.post("http://localhost:8000/login", {
+      const response = await axios.post(`${API_BASE}/login`, {
         email,
         password,
       });

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_BASE } from './config';
 import axios from 'axios';
 
 function AnalyseESG({ reportId }) {
@@ -10,7 +11,7 @@ function AnalyseESG({ reportId }) {
     setLoading(true);
     setError("");
     try {
-      const response = await axios.post(`http://127.0.0.1:8000/generate-esg-environment/${reportId}`);
+      const response = await axios.post(`${API_BASE}/generate-esg-environment/${reportId}`);
       setResult(response.data.esg_environment_report);
     } catch (err) {
       setError("Erreur lors de l'analyse : " + err.response?.data?.detail || err.message);

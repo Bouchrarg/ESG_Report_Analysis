@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { API_BASE } from './config';
 import { getUserIdFromToken } from "./utils/auth";
 
 function Profile() {
@@ -8,7 +9,7 @@ function Profile() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/users/${userId}`);
+        const res = await fetch(`${API_BASE}/users/${userId}`);
         if (res.ok) {
           const data = await res.json();
           setUser(data);

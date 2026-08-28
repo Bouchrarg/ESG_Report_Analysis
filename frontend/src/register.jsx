@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE } from './config';
 import axios from "axios";
 
 function Register() {
@@ -24,7 +25,7 @@ function Register() {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://localhost:8000/register", {
+      const res = await axios.post(`${API_BASE}/register`, {
       first_name: firstName,
       last_name: lastName,
       email,

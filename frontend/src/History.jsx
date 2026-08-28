@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE } from './config';
 import { motion } from "framer-motion";
 import { getUserIdFromToken } from "./utils/auth";
 import { FileText, GitCompare, BarChart3, Calendar, Download, Eye } from "lucide-react";
@@ -21,7 +22,7 @@ const History = () => {
     setError("");
 
     try {
-      const response = await fetch(`http://localhost:8000/user-history/${userId}`);
+      const response = await fetch(`${API_BASE}/user-history/${userId}`);
       if (!response.ok) throw new Error("Erreur lors de la récupération de l'historique");
 
       const data = await response.json();

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE } from './config';
 import axios from "axios";
 
 export default function CompareESG() {
@@ -10,7 +11,7 @@ export default function CompareESG() {
   const handleCompare = async () => {
     setLoading(true);
     try {
-      const response = await axios.post("http://localhost:8000/compare-esg/", {
+      const response = await axios.post(`${API_BASE}/compare-esg/`, {
         report1,
         report2,
       });

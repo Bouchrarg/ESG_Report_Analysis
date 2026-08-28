@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE } from './config';
 import { motion } from "framer-motion";
 import UploadTrigger from "./UploadReport";
 import ReportsList from "./ReportsList";
@@ -69,7 +70,7 @@ function Dashboard() {
     if (!userId) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/analysis-history/by-user/${userId}`);
+      const res = await fetch(`${API_BASE}/analysis-history/by-user/${userId}`);
       const data = await res.json();
       
       if (data.status === "success") {
@@ -85,7 +86,7 @@ function Dashboard() {
 
   const fetchReports = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/reports/${userId}`);
+      const response = await fetch(`${API_BASE}/reports/${userId}`);
       if (response.ok) {
         const data = await response.json();
         setReports(data);
@@ -105,7 +106,7 @@ function Dashboard() {
 
   try {
     const response = await fetch(
-      `http://localhost:8000/analyse-report/${selectedReport.id}?user_id=${userId}`,
+      `${API_BASE}/analyse-report/${selectedReport.id}?user_id=${userId}`,
       {
         method: "GET",
         headers: {
@@ -143,7 +144,7 @@ const handleRefreshComparison = async () => {
   setComparisonError("");
 
   try {
-    const response = await fetch("http://localhost:8000/refresh-comparison", {
+    const response = await fetch(`${API_BASE}/refresh-comparison`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -177,7 +178,7 @@ const handleRefreshComparison = async () => {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/analyze-keywords/${selectedReport.id}?language=${selectedLanguage}`,
+        `${API_BASE}/analyze-keywords/${selectedReport.id}?language=${selectedLanguage}`,
         {
           method: "POST",
           headers: {
@@ -237,7 +238,7 @@ const refreshUserData = async () => {
   if (selectedReport) {
     // Rafraîchir l'historique du rapport sélectionné
     try {
-      const res = await fetch(`http://localhost:8000/analysis-history/by-report/${selectedReport.id}`);
+      const res = await fetch(`${API_BASE}/analysis-history/by-report/${selectedReport.id}`);
       const data = await res.json();
       if (data.status === "success") {
         setAnalysisHistory(data.history);
@@ -279,7 +280,7 @@ const handleCompareReports = async () => {
       report2_id: selectedReport2.id
     });
 
-    const response = await fetch("http://localhost:8000/compare-reports", {
+    const response = await fetch(`${API_BASE}/compare-reports`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -330,7 +331,7 @@ const handleCompareReports = async () => {
     setKeywordComparisonResult(null);
 
     try {
-      const response = await fetch(`http://localhost:8000/compare-keywords?language=${selectedLanguage}`, {
+      const response = await fetch(`${API_BASE}/compare-keywords?language=${selectedLanguage}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -424,7 +425,7 @@ const downloadAnalysisJSON = () => {
     if (!selectedReport?.id) return;
     
     try {
-      const response = await fetch(`http://localhost:8000/export-keywords-analysis/${selectedReport.id}?format=json`, {
+      const response = await fetch(`${API_BASE}/export-keywords-analysis/${selectedReport.id}?format=json`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -453,7 +454,7 @@ const downloadComparisonHTML = async () => {
   }
 
   try {
-    const response = await fetch("http://localhost:8000/download-comparison-pdf", {
+    const response = await fetch(`${API_BASE}/download-comparison-pdf`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -517,7 +518,7 @@ const truncateText = (text, maxLength = 200) => {
   }
 
   try {
-    const response = await fetch("http://localhost:8000/download-comparison-json", {
+    const response = await fetch(`${API_BASE}/download-comparison-json`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

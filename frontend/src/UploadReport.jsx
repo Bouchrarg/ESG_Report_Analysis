@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { API_BASE } from './config';
 import axios from "axios";
 
 function UploadTrigger({ userId }) {
@@ -22,7 +23,7 @@ function UploadTrigger({ userId }) {
     formData.append("user_id", userId);
 
     try {
-      await axios.post("http://localhost:8000/upload-report", formData, {
+      await axios.post(`${API_BASE}/upload-report`, formData, {
         headers: { "Content-type": "multipart/form-data" },
       });
       setMessage("Fichier uploadé avec succès !");
