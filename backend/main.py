@@ -26,6 +26,8 @@ from keyword_analyzer import ESGKeywordAnalyzer
 from dotenv import load_dotenv
 import re 
 
+load_dotenv()
+
 app = FastAPI()
 
 create_users_table()
@@ -36,20 +38,21 @@ initialize_advanced_features()
 
 
 origins = [
-    "http://localhost:5173",  
-    "http://127.0.0.1:5173",
+    origin.strip()
+    for origin in os.getenv(
+        "ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",")
+    if origin.strip()
 ]
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_MODEL_PREMIUM = "openai/gpt-4o"  # Modèle premium

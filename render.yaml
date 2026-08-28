@@ -1,0 +1,21 @@
+# Render Blueprint. In the Render dashboard: New + -> Blueprint, point it at
+# this repo, and it picks up this file. Secrets (sync: false) are entered
+# once in the dashboard, never stored in this file or in git.
+services:
+  - type: web
+    name: esg-report-analysis-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: SECRET_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        # Replace with the real Vercel URL once the frontend is deployed
+        value: http://localhost:5173
