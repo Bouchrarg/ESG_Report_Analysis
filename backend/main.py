@@ -24,7 +24,8 @@ import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from keyword_analyzer import ESGKeywordAnalyzer
 from dotenv import load_dotenv
-import re 
+from seed_demo_data import seed_demo_data
+import re
 
 load_dotenv()
 
@@ -35,6 +36,7 @@ create_reports_table()
 create_advanced_analysis_table()
 create_ai_comparisons_table()
 initialize_advanced_features()
+seed_demo_data()
 
 
 origins = [
