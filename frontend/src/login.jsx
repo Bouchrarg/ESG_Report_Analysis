@@ -39,6 +39,23 @@ function Login() {
         <h2 className="text-4xl font-extrabold mb-8 text-center text-gray-900 drop-shadow-md">
           Connexion
         </h2>
+
+        <div className="mb-6 p-4 rounded-xl bg-indigo-50 border border-indigo-200 text-sm text-gray-700">
+          <p className="font-semibold text-indigo-800 mb-1">Compte de démonstration</p>
+          <p>Email : demo@example.com</p>
+          <p>Mot de passe : Demo1234!</p>
+          <button
+            type="button"
+            onClick={() => {
+              setEmail("demo@example.com");
+              setPassword("Demo1234!");
+            }}
+            className="mt-3 w-full py-2 rounded-lg text-indigo-700 font-semibold border border-indigo-300 hover:bg-indigo-100 transition"
+          >
+            Remplir les identifiants de démonstration
+          </button>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label
